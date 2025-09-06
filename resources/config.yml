@@ -1,0 +1,14 @@
+# ===== Kern-Features =====
+progressive-detail: true
+chunk-preload: true
+lazy-light: true
+rpc-threading: true
+paste-threading: true
+
+# ===== Gebäude & Immobilien =====
+generate-buildings: true
+building-purchase: true
+sign-purchase: true
+osm-interiors: false
+shop-system: false
+synchronize-height: true
