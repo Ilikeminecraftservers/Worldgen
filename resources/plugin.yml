@@ -1,0 +1,15 @@
+name: HybridSurvivalPlugin
+main: de.yourplugin.hybrid.HybridSurvivalConfigPlugin
+version: 1.0
+api-version: 1.20
+
+commands:
+  building:
+    description: Kauf, Verkauf und Verwaltung von Gebäuden
+    usage: /building <buy|sell|info|teleport> [Adresse]
+    permission: hybrid.building
+
+permissions:
+  hybrid.building:
+    description: Berechtigt Gebäude zu kaufen oder zu verkaufen
+    default: true
