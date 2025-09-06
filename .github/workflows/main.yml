@@ -20,11 +20,8 @@ jobs:
         distribution: temurin
         java-version: 20
 
-    - name: Grant execute permission for Gradle wrapper
-      run: chmod +x gradlew
-
     - name: Build Plugin JAR
-      run: ./gradlew build
+      run: gradle build
 
     - name: Archive JAR
       uses: actions/upload-artifact@v4
