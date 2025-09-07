@@ -12,3 +12,36 @@ sign-purchase: true
 osm-interiors: false
 shop-system: false
 synchronize-height: true
+
+# ===== Arnis-Integration =====
+arnis:
+  path: "/usr/local/bin/arnis"   # Pfad zur Arnis-CLI
+  bbox-radius-meters: 100        # Größe der Bounding Box in Metern
+
+# ===== Straßen & Parkplätze =====
+streets:
+  enabled: true
+  block: BLUE_ICE                # Material für Straßenkörper
+  line-block: ICE                # Material für Straßenlinien
+  width: 5                       # Standard-Straßenbreite
+  line-width: 1                  # Breite der Straßenlinien
+  sidewalks:
+    enabled: false               # Gehwege optional aktivierbar
+    block: STONE_BRICKS          # Standardblock für Gehwege
+
+parkings:
+  enabled: true
+  block: PACKED_ICE              # Material für Parkflächen
+  line-block: ICE                # Material für Parkplatzmarkierungen
+  slot-size: 3x6                 # Größe eines Parkplatz-Slots (Breite x Länge)
+
+# ===== Dekorationen & Infrastruktur =====
+decorations:
+  street-lamps:
+    enabled: false
+    schematic-path: schematics/lamps/ # Ordner mit Schem-Dateien
+  trees:
+    enabled: false
+    schematic-path: schematics/trees/
+  benches:
+    enabled: false
