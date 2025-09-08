@@ -1,14 +1,10 @@
-name: Build & Release HybridSurvivalPlugin
+name: Build Plugin
 
 on:
   push:
-    branches:
-      - main
+    branches: [ "main" ]
   pull_request:
-    branches:
-      - main
-  release:
-    types: [created]
+    branches: [ "main" ]
 
 jobs:
   build:
@@ -24,33 +20,11 @@ jobs:
           distribution: temurin
           java-version: 21
 
-      - name: Make gradlew executable
-        run: chmod +x ./gradlew
+      - name: Build with Gradle (no wrapper)
+        run: gradle build --stacktrace
 
-      - name: Build with Gradle
-        run: ./gradlew build --stacktrace
-
-      - name: Upload plugin jar (Artifact)
+      - name: Upload Plugin Artifact
         uses: actions/upload-artifact@v4
         with:
           name: HybridSurvivalPlugin
           path: build/libs/*.jar
-
-  release:
-    if: github.event_name == 'release'
-    runs-on: ubuntu-latest
-    needs: build
-
-    steps:
-      - name: Download build artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: HybridSurvivalPlugin
-          path: ./build-artifacts
-
-      - name: Upload JAR to Release
-        uses: softprops/action-gh-release@v2
-        with:
-          files: ./build-artifacts/*.jar
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
