@@ -1,4 +1,4 @@
-package de.yourplugin.hybrid;
+package de.Yourplugin.hybrid;
 
 import org.bukkit.ChatColor;
 import org.bukkit.command.Command;
@@ -8,34 +8,36 @@ import org.bukkit.entity.Player;
 
 public class SellBuildingCommand implements CommandExecutor {
 
-    private final HybridSurvivalConfigPlugin plugin;
+    private final HybridSurvivalPluginConfig plugin;
+    private final BuildingManager buildingManager;
 
-    public SellBuildingCommand(HybridSurvivalConfigPlugin plugin) {
+    public SellBuildingCommand(HybridSurvivalPluginConfig plugin) {
         this.plugin = plugin;
+        this.buildingManager = plugin.getBuildingManager();
     }
 
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
-        if (!(sender instanceof Player)) {
-            sender.sendMessage(ChatColor.RED + "Nur Spieler können Gebäude verkaufen.");
+        if (!(sender instanceof Player player)) {
+            sender.sendMessage("Nur Spieler können Gebäude verkaufen.");
             return true;
         }
+
         if (args.length < 1) {
-            sender.sendMessage(ChatColor.YELLOW + "Benutzung: /sellbuilding <Adresse>");
+            player.sendMessage(ChatColor.RED + "Benutzung: /sellbuilding <Adresse>");
             return true;
         }
 
-        Player player = (Player) sender;
-        String address = String.join(" ", args);
+        String address = args[0];
+        BuildingData building = buildingManager.getBuilding(address);
 
-        BuildingData building = plugin.getBuilding(address);
         if (building == null || !player.getName().equalsIgnoreCase(building.getOwner())) {
-            player.sendMessage(ChatColor.RED + "Du besitzt dieses Gebäude nicht.");
+            player.sendMessage(ChatColor.RED + "Dir gehört dieses Gebäude nicht!");
             return true;
         }
 
-        plugin.getAllBuildings().remove(address);
-        player.sendMessage(ChatColor.GREEN + "Du hast das Gebäude " + address + " verkauft!");
+        buildingManager.removeBuilding(address);
+        player.sendMessage(ChatColor.GREEN + "Du hast dein Gebäude bei '" + address + "' verkauft!");
         return true;
     }
 }
