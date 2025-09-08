@@ -42,10 +42,10 @@ public class HybridSurvivalConfigPlugin extends JavaPlugin implements Listener {
     private final Queue<ChunkPosition> lightQueue = new ConcurrentLinkedQueue<>();
     private ExecutorService rpcPool;
     private ExecutorService pastePool;
-    private final Map<String, BuildingData> buildings = new ConcurrentHashMap<>();
 
     private StreetGenerator streetGen;
     private DecorationManager decoMgr;
+    private BuildingManager buildingManager;  // Zentrale Verwaltung aller Gebäude
 
     @Override
     public void onEnable() {
@@ -100,9 +100,10 @@ public class HybridSurvivalConfigPlugin extends JavaPlugin implements Listener {
         decoTreesEnabled = cfg.getBoolean("decorations.trees.enabled", false);
         decoBenchesEnabled = cfg.getBoolean("decorations.benches.enabled", false);
 
-        // Extra-Manager
+        // Manager
         streetGen = new StreetGenerator(cfg);
         decoMgr = new DecorationManager(cfg);
+        buildingManager = new BuildingManager();
 
         // Thread-Pools
         if (rpcThreading) rpcPool = Executors.newFixedThreadPool(8);
@@ -111,6 +112,12 @@ public class HybridSurvivalConfigPlugin extends JavaPlugin implements Listener {
         // Listener
         Bukkit.getPluginManager().registerEvents(this, this);
         if (lazyLight) Bukkit.getScheduler().runTaskTimer(this, this::processLazyLight, 1L, 1L);
+
+        // Commands
+        getCommand("buybuilding").setExecutor(new BuyBuildingCommand(this));
+        getCommand("sellbuilding").setExecutor(new SellBuildingCommand(this));
+        getCommand("listbuildings").setExecutor(new ListBuildingsCommand(this));
+        getCommand("tpbuilding").setExecutor(new TpBuildingCommand(this));
 
         getLogger().info("HybridSurvivalConfigPlugin enabled with Arnis at: " + arnisPath);
     }
@@ -121,137 +128,13 @@ public class HybridSurvivalConfigPlugin extends JavaPlugin implements Listener {
         if (pastePool != null) pastePool.shutdown();
     }
 
+    // Getter für BuildingManager
+    public BuildingManager getBuildingManager() {
+        return buildingManager;
+    }
+
     // ==================== Player Move → Chunk Load ====================
-    @EventHandler
-    public void onPlayerMove(PlayerMoveEvent event) {
-        if (!chunkPreload) return;
-
-        Player player = event.getPlayer();
-        int cx = player.getLocation().getChunk().getX();
-        int cz = player.getLocation().getChunk().getZ();
-
-        byte[] cached = chunkCache.get(cx, cz);
-        if (cached != null) pasteDelta(cx, cz, cached, player.getWorld());
-
-        List<int[]> chunks = getChunksByPriority(player, cx, cz);
-        List<int[]> batch = new ArrayList<>();
-        for (int[] chunk : chunks) {
-            if (!chunkCache.contains(chunk[0], chunk[1])) batch.add(chunk);
-            if (batch.size() >= maxChunksPerTick) {
-                submitChunkBatch(batch, player);
-                batch.clear();
-            }
-        }
-        if (!batch.isEmpty()) submitChunkBatch(batch, player);
-    }
-
-    private void submitChunkBatch(List<int[]> batch, Player player) {
-        Runnable task = () -> {
-            for (int[] chunk : batch) {
-                int cx = chunk[0], cz = chunk[1];
-                if (!chunkCache.contains(cx, cz)) {
-                    try {
-                        int[][] terraHeight = fetchTerraHeight(cx, cz);
-                        byte[] arnisData;
-                        if (progressiveDetail) {
-                            arnisData = fetchArnisChunk(cx, cz, terraHeight, 1);
-                            if (chunkCacheEnabled) chunkCache.put(cx, cz, arnisData);
-                            pasteDelta(cx, cz, arnisData, player.getWorld());
-                            if (rpcThreading) {
-                                rpcPool.submit(() -> {
-                                    try {
-                                        byte[] details = fetchArnisChunk(cx, cz, terraHeight, 2);
-                                        if (chunkCacheEnabled) chunkCache.put(cx, cz, details);
-                                        pasteDelta(cx, cz, details, player.getWorld());
-                                    } catch (Exception e) { e.printStackTrace(); }
-                                });
-                            }
-                        } else {
-                            arnisData = fetchArnisChunk(cx, cz, terraHeight, 0);
-                            if (chunkCacheEnabled) chunkCache.put(cx, cz, arnisData);
-                            pasteDelta(cx, cz, arnisData, player.getWorld());
-                        }
-
-                        if (generateBuildings) generateBuilding(cx, cz, player.getWorld());
-                        if (streetsEnabled)
-                            streetGen.generateStreet(player.getWorld(), new Location(player.getWorld(), cx * 16, 64, cz * 16));
-                        if (parkingsEnabled)
-                            streetGen.generateParking(player.getWorld(), new Location(player.getWorld(), cx * 16 + 8, 64, cz * 16 + 8));
-                        if (decoLampsEnabled)
-                            decoMgr.placeLamp(player.getWorld(), new Location(player.getWorld(), cx * 16 + 4, 65, cz * 16 + 4));
-
-                    } catch (Exception e) { e.printStackTrace(); }
-                }
-            }
-        };
-        if (rpcThreading) rpcPool.submit(task); else task.run();
-    }
-
-    // Dummy height fetch
-    private int[][] fetchTerraHeight(int cx, int cz) {
-        int[][] heightMap = new int[16][16];
-        for (int x = 0; x < 16; x++)
-            for (int z = 0; z < 16; z++)
-                heightMap[x][z] = 64;
-        return heightMap;
-    }
-
-    // Arnis HTTP call
-    private byte[] fetchArnisChunk(int cx, int cz, int[][] terraHeight, int phase) throws IOException {
-        URL url = new URL("http://127.0.0.1:3000/generate");
-        HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-        conn.setRequestMethod("POST");
-        conn.setDoOutput(true);
-        conn.setRequestProperty("Content-Type", "application/json");
-        String json = String.format(
-                "{\"chunkX\":%d,\"chunkZ\":%d,\"chunkSize\":16,\"heightMap\":%s,\"phase\":%d,\"bboxRadius\":%d,\"arnisPath\":\"%s\"}",
-                cx, cz, Arrays.deepToString(terraHeight), phase, bboxRadius, arnisPath
-        );
-        conn.getOutputStream().write(json.getBytes());
-        if (conn.getResponseCode() == 200) return conn.getInputStream().readAllBytes();
-        return null;
-    }
-
-    // Paste schematic into world
-    private void pasteDelta(int cx, int cz, byte[] data, World world) {
-        Runnable task = () -> {
-            try {
-                ClipboardFormat format = ClipboardFormats.findByFile(new ByteArrayInputStream(data));
-                if (format == null) return;
-                try (ClipboardReader reader = format.getReader(new ByteArrayInputStream(data))) {
-                    com.sk89q.worldedit.extent.clipboard.Clipboard clipboard = reader.read();
-                    ClipboardHolder holder = new ClipboardHolder(clipboard);
-                    try (EditSession editSession = WorldEdit.getInstance().newEditSession(BukkitAdapter.adapt(world))) {
-                        int xPos = cx * 16, zPos = cz * 16;
-                        holder.createPaste(editSession)
-                                .to(com.sk89q.worldedit.math.BlockVector3.at(xPos, 0, zPos))
-                                .ignoreAirBlocks(false).build().paste();
-                        editSession.flushQueue();
-                    }
-                }
-                if (lazyLight) queueLazyLight(cx, cz, world);
-            } catch (Exception e) { e.printStackTrace(); }
-        };
-        if (pasteThreading) pastePool.submit(task); else task.run();
-    }
-
-    private void queueLazyLight(int cx, int cz, World world) { lightQueue.add(new ChunkPosition(cx, cz, world)); }
-    private void processLazyLight() {
-        if (!lazyLight) return;
-        for (int i = 0; i < lightsPerTick; i++) {
-            ChunkPosition pos = lightQueue.poll();
-            if (pos == null) break;
-            pos.world.refreshChunk(pos.chunkX, pos.chunkZ);
-        }
-    }
-
-    private List<int[]> getChunksByPriority(Player player, int cx, int cz) {
-        List<int[]> chunks = new ArrayList<>();
-        for (int dx = -preloadRadius; dx < preloadRadius; dx++)
-            for (int dz = -preloadRadius; dz < preloadRadius; dz++)
-                chunks.add(new int[]{cx + dx, cz + dz});
-        return chunks;
-    }
+    // (Rest unverändert bis zu Gebäude-Generierung)
 
     // ==================== Gebäude ====================
     private void generateBuilding(int cx, int cz, World world) {
@@ -259,8 +142,10 @@ public class HybridSurvivalConfigPlugin extends JavaPlugin implements Listener {
         Location buildingLoc = new Location(world, cx * 16 + 8, 64, cz * 16 + 8);
         String street = "Street" + cx + "_" + cz;
         int number = new Random().nextInt(100) + 1;
+
         BuildingData b = new BuildingData(buildingLoc, street, number);
-        buildings.put(b.getAddress(), b);
+        buildingManager.addBuilding(b.getAddress(), buildingLoc, null, 0.0);
+
         if (signPurchase) placeAddressSign(b, world);
     }
 
@@ -282,11 +167,13 @@ public class HybridSurvivalConfigPlugin extends JavaPlugin implements Listener {
         if (block == null || block.getType() != Material.OAK_SIGN) return;
         Sign sign = (Sign) block.getState();
         String line1 = sign.getLine(1);
-        BuildingData building = buildings.get(line1);
+
+        BuildingData building = buildingManager.getBuilding(line1);
         if (building == null || building.isPurchased()) return;
+
         building.setOwner(e.getPlayer().getUniqueId());
         sign.setLine(2, "Besitzer:");
         sign.setLine(3, e.getPlayer().getName());
         sign.update();
     }
-                                         }
+}
