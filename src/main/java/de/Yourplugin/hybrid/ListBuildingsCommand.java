@@ -1,4 +1,4 @@
-package de.yourplugin.hybrid;
+package de.Yourplugin.hybrid;
 
 import org.bukkit.ChatColor;
 import org.bukkit.command.Command;
@@ -7,24 +7,28 @@ import org.bukkit.command.CommandSender;
 
 public class ListBuildingsCommand implements CommandExecutor {
 
-    private final HybridSurvivalConfigPlugin plugin;
+    private final HybridSurvivalPluginConfig plugin;
+    private final BuildingManager buildingManager;
 
-    public ListBuildingsCommand(HybridSurvivalConfigPlugin plugin) {
+    public ListBuildingsCommand(HybridSurvivalPluginConfig plugin) {
         this.plugin = plugin;
+        this.buildingManager = plugin.getBuildingManager();
     }
 
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
-        if (plugin.getAllBuildings().isEmpty()) {
-            sender.sendMessage(ChatColor.YELLOW + "Es wurden noch keine Gebäude registriert.");
+        if (buildingManager.getAllBuildings().isEmpty()) {
+            sender.sendMessage(ChatColor.YELLOW + "Es wurden noch keine Gebäude gekauft.");
             return true;
         }
 
-        sender.sendMessage(ChatColor.AQUA + "Liste der Gebäude:");
-        plugin.getAllBuildings().forEach((address, building) -> {
-            String owner = building.getOwner() != null ? building.getOwner() : "Niemand";
-            sender.sendMessage(ChatColor.GRAY + "- " + ChatColor.WHITE + address + ChatColor.GRAY + " (Besitzer: " + owner + ")");
-        });
+        sender.sendMessage(ChatColor.GREEN + "Alle Gebäude:");
+        for (BuildingData building : buildingManager.getAllBuildings()) {
+            sender.sendMessage(ChatColor.AQUA + "- " + building.getOwner() +
+                    " besitzt ein Gebäude bei: " + building.getLocation().getBlockX() + ", " +
+                    building.getLocation().getBlockY() + ", " +
+                    building.getLocation().getBlockZ());
+        }
         return true;
     }
 }
