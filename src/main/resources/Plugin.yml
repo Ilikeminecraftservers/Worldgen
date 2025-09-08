@@ -1,0 +1,38 @@
+name: HybridSurvivalConfig
+main: de.yourplugin.hybrid.HybridSurvivalConfigPlugin
+version: 1.0.0
+api-version: 1.21
+author: dwuptpuma
+description: Hybrid Survival Plugin mit Auto-Arnis-Generierung, Gebäude-Handling und Commands
+
+commands:
+  buybuilding:
+    description: Kaufe ein Gebäude
+    usage: /buybuilding <Adresse>
+    permission: hybridsurvival.buy
+  sellbuilding:
+    description: Verkaufe dein Gebäude
+    usage: /sellbuilding <Adresse>
+    permission: hybridsurvival.sell
+  tpbuilding:
+    description: Teleportiere dich zu einem Gebäude
+    usage: /tpbuilding <Adresse>
+    permission: hybridsurvival.tp
+  listbuildings:
+    description: Zeige eine Liste aller Gebäude
+    usage: /listbuildings
+    permission: hybridsurvival.list
+
+permissions:
+  hybridsurvival.buy:
+    description: Erlaubt das Kaufen von Gebäuden
+    default: true
+  hybridsurvival.sell:
+    description: Erlaubt das Verkaufen von Gebäuden
+    default: true
+  hybridsurvival.tp:
+    description: Erlaubt das Teleportieren zu Gebäuden
+    default: op
+  hybridsurvival.list:
+    description: Erlaubt das Anzeigen der Gebäudeliste
+    default: true
