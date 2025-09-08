@@ -1,6 +1,5 @@
-package de.yourplugin.hybrid;
+package de.Yourplugin.hybrid;
 
-import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.Location;
 import org.bukkit.command.Command;
@@ -10,40 +9,37 @@ import org.bukkit.entity.Player;
 
 public class TpBuildingCommand implements CommandExecutor {
 
-    private final HybridSurvivalConfigPlugin plugin;
+    private final HybridSurvivalPluginConfig plugin;
+    private final BuildingManager buildingManager;
 
-    public TpBuildingCommand(HybridSurvivalConfigPlugin plugin) {
+    public TpBuildingCommand(HybridSurvivalPluginConfig plugin) {
         this.plugin = plugin;
+        this.buildingManager = plugin.getBuildingManager();
     }
 
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
-        if (!(sender instanceof Player)) {
-            sender.sendMessage(ChatColor.RED + "Nur Spieler können Gebäude teleportieren.");
+        if (!(sender instanceof Player player)) {
+            sender.sendMessage("Nur Spieler können sich teleportieren.");
             return true;
         }
+
         if (args.length < 1) {
-            sender.sendMessage(ChatColor.YELLOW + "Benutzung: /tpbuilding <Adresse>");
+            player.sendMessage(ChatColor.RED + "Benutzung: /tpbuilding <Adresse>");
             return true;
         }
 
-        Player player = (Player) sender;
-        String address = String.join(" ", args);
+        String address = args[0];
+        BuildingData building = buildingManager.getBuilding(address);
 
-        BuildingData building = plugin.getBuilding(address);
         if (building == null) {
-            player.sendMessage(ChatColor.RED + "Kein Gebäude mit dieser Adresse gefunden.");
+            player.sendMessage(ChatColor.RED + "Kein Gebäude mit dieser Adresse gefunden!");
             return true;
         }
 
         Location loc = building.getLocation();
-        if (loc == null) {
-            player.sendMessage(ChatColor.RED + "Für dieses Gebäude wurde noch kein Standort gesetzt.");
-            return true;
-        }
-
         player.teleport(loc);
-        player.sendMessage(ChatColor.GREEN + "Teleportiert zu " + address + ".");
+        player.sendMessage(ChatColor.GREEN + "Du wurdest zum Gebäude bei '" + address + "' teleportiert.");
         return true;
     }
 }
