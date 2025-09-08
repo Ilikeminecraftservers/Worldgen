@@ -1,34 +1,56 @@
-plugins {
-    id 'java'
-}
+name: Build & Release HybridSurvivalPlugin
 
-group = 'de.yourplugin'
-version = '1.0-SNAPSHOT'
-sourceCompatibility = '21'
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  release:
+    types: [created]
 
-repositories {
-    mavenCentral()
-    maven {
-        name = 'papermc'
-        url = 'https://repo.papermc.io/repository/maven-public/'
-    }
-    maven {
-        name = 'enginehub'
-        url = 'https://maven.enginehub.org/repo/'
-    }
-}
+jobs:
+  build:
+    runs-on: ubuntu-latest
 
-dependencies {
-    // Paper API (falls du Paper nutzt)
-    compileOnly 'io.papermc.paper:paper-api:1.21.4-R0.1-SNAPSHOT'
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-    // WorldEdit Bukkit
-    implementation 'com.sk89q.worldedit:worldedit-bukkit:7.2.15'
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
 
-    // Optional: WorldEdit Core falls benötigt
-    implementation 'com.sk89q.worldedit:worldedit-core:7.2.15'
-}
+      - name: Make gradlew executable
+        run: chmod +x ./gradlew
 
-tasks.withType(JavaCompile) {
-    options.encoding = 'UTF-8'
-}
+      - name: Build with Gradle
+        run: ./gradlew build --stacktrace
+
+      - name: Upload plugin jar (Artifact)
+        uses: actions/upload-artifact@v4
+        with:
+          name: HybridSurvivalPlugin
+          path: build/libs/*.jar
+
+  release:
+    if: github.event_name == 'release'
+    runs-on: ubuntu-latest
+    needs: build
+
+    steps:
+      - name: Download build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: HybridSurvivalPlugin
+          path: ./build-artifacts
+
+      - name: Upload JAR to Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ./build-artifacts/*.jar
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
