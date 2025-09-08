@@ -3,7 +3,7 @@
 # ============================================
 
 # ===== Kern-Features =====
-progressive-detail: true         # Mehrere Detailstufen bei Arnis-Generierung
+progressive-detail: false         # Mehrere Detailstufen bei Arnis-Generierung
 chunk-preload: true              # Chunks im Umkreis des Spielers vorladen
 lazy-light: true                 # Lichtupdates verzögert ausführen
 rpc-threading: true              # RPC-Aufrufe asynchron ausführen
@@ -14,13 +14,13 @@ generate-buildings: true         # Gebäude beim Chunk-Load generieren
 building-purchase: true          # Gebäude können gekauft werden
 sign-purchase: true              # Kauf über Schilder möglich
 osm-interiors: false             # Interieur aus OSM generieren
-shop-system: false               # Shopsystem aktivieren
+shop-system: true               # Shopsystem aktivieren
 synchronize-height: true         # Bauhöhe mit Welt-Höhe synchronisieren
 
 # ===== Arnis-Integration =====
 arnis:
   path: "/usr/local/bin/arnis"   # Pfad zur Arnis-CLI
-  bbox-radius-meters: 100        # Größe der Bounding Box in Metern
+  bbox-radius-meters: 512        # Größe der Bounding Box in Metern
 
 # ===== Straßen & Parkplätze =====
 streets:
