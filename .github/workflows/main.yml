@@ -1,33 +1,30 @@
-plugins {
-    id 'java'
-}
+name: Build Plugin
 
-group = 'de.yourplugin.hybrid'
-version = '1.0.0'
-description = 'Hybrid Survival Plugin'
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
 
-java {
-    toolchain {
-        languageVersion = JavaLanguageVersion.of(21)
-    }
-}
+jobs:
+  build:
+    runs-on: ubuntu-latest
 
-repositories {
-    mavenCentral()
-    maven { url = 'https://maven.enginehub.org/repo/' }
-    maven { url = 'https://repo.papermc.io/repository/maven-public/' }
-}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-dependencies {
-    compileOnly 'io.papermc.paper:paper-api:1.21.4-R0.1-SNAPSHOT'
-    compileOnly 'com.sk89q.worldedit:worldedit-bukkit:7.3.0'
-}
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
 
-tasks.withType(JavaCompile) {
-    options.encoding = 'UTF-8'
-}
+      - name: Build with Gradle (no wrapper)
+        run: gradle build --stacktrace
 
-jar {
-    archiveBaseName.set('HybridSurvivalPlugin')
-    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
-}
+      - name: Upload Plugin Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: HybridSurvivalPlugin
+          path: build/libs/*.jar
