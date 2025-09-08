@@ -4,10 +4,11 @@ import com.sk89q.worldedit.*;
 import com.sk89q.worldedit.bukkit.BukkitAdapter;
 import com.sk89q.worldedit.extent.clipboard.*;
 import com.sk89q.worldedit.extent.clipboard.io.*;
-import de.yourplugin.hybrid.commands.*;
+import com.sk89q.worldedit.session.ClipboardHolder;
 import org.bukkit.*;
 import org.bukkit.block.Block;
 import org.bukkit.block.Sign;
+import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.entity.Player;
 import org.bukkit.event.Listener;
 import org.bukkit.event.EventHandler;
@@ -29,7 +30,13 @@ public class HybridSurvivalConfigPlugin extends JavaPlugin implements Listener {
     private boolean teleportToBuilding, commandPurchase, buildingSell, guiBuildingList;
     private boolean asyncEvents, telemetry, chunkCacheEnabled, prefetchSpawn;
 
+    private boolean streetsEnabled, sidewalksEnabled, parkingsEnabled;
+    private boolean decoLampsEnabled, decoTreesEnabled, decoBenchesEnabled;
+
     private int maxChunksPerTick, lightsPerTick, preloadRadius;
+    private String arnisPath;
+    private int bboxRadius;
+    private Material streetBlock, lineBlock, sidewalkBlock, parkingBlock, parkingLineBlock;
 
     private final ChunkCache chunkCache = new ChunkCache();
     private final Queue<ChunkPosition> lightQueue = new ConcurrentLinkedQueue<>();
@@ -37,35 +44,65 @@ public class HybridSurvivalConfigPlugin extends JavaPlugin implements Listener {
     private ExecutorService pastePool;
     private final Map<String, BuildingData> buildings = new ConcurrentHashMap<>();
 
+    private StreetGenerator streetGen;
+    private DecorationManager decoMgr;
+
     @Override
     public void onEnable() {
         saveDefaultConfig();
+        FileConfiguration cfg = getConfig();
 
-        // Config laden
-        progressiveDetail = getConfig().getBoolean("progressive-detail", true);
-        chunkPreload = getConfig().getBoolean("chunk-preload", true);
-        lazyLight = getConfig().getBoolean("lazy-light", true);
-        rpcThreading = getConfig().getBoolean("rpc-threading", true);
-        pasteThreading = getConfig().getBoolean("paste-threading", true);
+        // Kern-Features
+        progressiveDetail = cfg.getBoolean("progressive-detail", true);
+        chunkPreload = cfg.getBoolean("chunk-preload", true);
+        lazyLight = cfg.getBoolean("lazy-light", true);
+        rpcThreading = cfg.getBoolean("rpc-threading", true);
+        pasteThreading = cfg.getBoolean("paste-threading", true);
 
-        generateBuildings = getConfig().getBoolean("generate-buildings", true);
-        buildingPurchase = getConfig().getBoolean("building-purchase", true);
-        signPurchase = getConfig().getBoolean("sign-purchase", true);
-        osmInteriors = getConfig().getBoolean("osm-interiors", false);
-        shopSystem = getConfig().getBoolean("shop-system", false);
-        synchronizeHeight = getConfig().getBoolean("synchronize-height", true);
-        teleportToBuilding = getConfig().getBoolean("teleport-to-building", true);
-        commandPurchase = getConfig().getBoolean("command-purchase", true);
-        buildingSell = getConfig().getBoolean("building-sell", true);
-        guiBuildingList = getConfig().getBoolean("gui-building-list", true);
+        // Gebäude & Immobilien
+        generateBuildings = cfg.getBoolean("generate-buildings", true);
+        buildingPurchase = cfg.getBoolean("building-purchase", true);
+        signPurchase = cfg.getBoolean("sign-purchase", true);
+        osmInteriors = cfg.getBoolean("osm-interiors", false);
+        shopSystem = cfg.getBoolean("shop-system", false);
+        synchronizeHeight = cfg.getBoolean("synchronize-height", true);
+        teleportToBuilding = cfg.getBoolean("teleport-to-building", true);
+        commandPurchase = cfg.getBoolean("command-purchase", true);
+        buildingSell = cfg.getBoolean("building-sell", true);
+        guiBuildingList = cfg.getBoolean("gui-building-list", true);
 
-        maxChunksPerTick = getConfig().getInt("max-chunks-per-tick", 16);
-        lightsPerTick = getConfig().getInt("lights-per-tick", 2);
-        preloadRadius = getConfig().getInt("preload-radius", 16);
-        asyncEvents = getConfig().getBoolean("async-events", true);
-        telemetry = getConfig().getBoolean("telemetry", true);
-        chunkCacheEnabled = getConfig().getBoolean("chunk-cache", true);
-        prefetchSpawn = getConfig().getBoolean("prefetch-spawn", true);
+        // Performance
+        maxChunksPerTick = cfg.getInt("max-chunks-per-tick", 16);
+        lightsPerTick = cfg.getInt("lights-per-tick", 2);
+        preloadRadius = cfg.getInt("preload-radius", 16);
+        asyncEvents = cfg.getBoolean("async-events", true);
+        telemetry = cfg.getBoolean("telemetry", true);
+        chunkCacheEnabled = cfg.getBoolean("chunk-cache", true);
+        prefetchSpawn = cfg.getBoolean("prefetch-spawn", true);
+
+        // Arnis-Integration
+        arnisPath = cfg.getString("arnis.path", "/usr/local/bin/arnis");
+        bboxRadius = cfg.getInt("arnis.bbox-radius-meters", 100);
+
+        // Straßen & Parkplätze
+        streetsEnabled = cfg.getBoolean("streets.enabled", true);
+        streetBlock = Material.matchMaterial(cfg.getString("streets.block", "BLUE_ICE"));
+        lineBlock = Material.matchMaterial(cfg.getString("streets.line-block", "ICE"));
+        sidewalksEnabled = cfg.getBoolean("streets.sidewalks.enabled", false);
+        sidewalkBlock = Material.matchMaterial(cfg.getString("streets.sidewalks.block", "STONE_BRICKS"));
+
+        parkingsEnabled = cfg.getBoolean("parkings.enabled", true);
+        parkingBlock = Material.matchMaterial(cfg.getString("parkings.block", "PACKED_ICE"));
+        parkingLineBlock = Material.matchMaterial(cfg.getString("parkings.line-block", "ICE"));
+
+        // Dekorationen
+        decoLampsEnabled = cfg.getBoolean("decorations.street-lamps.enabled", false);
+        decoTreesEnabled = cfg.getBoolean("decorations.trees.enabled", false);
+        decoBenchesEnabled = cfg.getBoolean("decorations.benches.enabled", false);
+
+        // Extra-Manager
+        streetGen = new StreetGenerator(cfg);
+        decoMgr = new DecorationManager(cfg);
 
         // Thread-Pools
         if (rpcThreading) rpcPool = Executors.newFixedThreadPool(8);
@@ -75,11 +112,7 @@ public class HybridSurvivalConfigPlugin extends JavaPlugin implements Listener {
         Bukkit.getPluginManager().registerEvents(this, this);
         if (lazyLight) Bukkit.getScheduler().runTaskTimer(this, this::processLazyLight, 1L, 1L);
 
-        // Commands
-        getCommand("buybuilding").setExecutor(new BuyBuildingCommand(this));
-        getCommand("sellbuilding").setExecutor(new SellBuildingCommand(this));
-        getCommand("tpbuilding").setExecutor(new TpBuildingCommand(this));
-        getCommand("listbuildings").setExecutor(new ListBuildingsCommand(this));
+        getLogger().info("HybridSurvivalConfigPlugin enabled with Arnis at: " + arnisPath);
     }
 
     @Override
@@ -138,21 +171,32 @@ public class HybridSurvivalConfigPlugin extends JavaPlugin implements Listener {
                             if (chunkCacheEnabled) chunkCache.put(cx, cz, arnisData);
                             pasteDelta(cx, cz, arnisData, player.getWorld());
                         }
+
                         if (generateBuildings) generateBuilding(cx, cz, player.getWorld());
+                        if (streetsEnabled)
+                            streetGen.generateStreet(player.getWorld(), new Location(player.getWorld(), cx * 16, 64, cz * 16));
+                        if (parkingsEnabled)
+                            streetGen.generateParking(player.getWorld(), new Location(player.getWorld(), cx * 16 + 8, 64, cz * 16 + 8));
+                        if (decoLampsEnabled)
+                            decoMgr.placeLamp(player.getWorld(), new Location(player.getWorld(), cx * 16 + 4, 65, cz * 16 + 4));
+
                     } catch (Exception e) { e.printStackTrace(); }
                 }
             }
         };
-        if (rpcThreading) rpcPool.submit(task);
-        else task.run();
+        if (rpcThreading) rpcPool.submit(task); else task.run();
     }
 
+    // Dummy height fetch
     private int[][] fetchTerraHeight(int cx, int cz) {
         int[][] heightMap = new int[16][16];
-        for (int x = 0; x < 16; x++) for (int z = 0; z < 16; z++) heightMap[x][z] = 64;
+        for (int x = 0; x < 16; x++)
+            for (int z = 0; z < 16; z++)
+                heightMap[x][z] = 64;
         return heightMap;
     }
 
+    // Arnis HTTP call
     private byte[] fetchArnisChunk(int cx, int cz, int[][] terraHeight, int phase) throws IOException {
         URL url = new URL("http://127.0.0.1:3000/generate");
         HttpURLConnection conn = (HttpURLConnection) url.openConnection();
@@ -160,14 +204,15 @@ public class HybridSurvivalConfigPlugin extends JavaPlugin implements Listener {
         conn.setDoOutput(true);
         conn.setRequestProperty("Content-Type", "application/json");
         String json = String.format(
-                "{\"chunkX\":%d,\"chunkZ\":%d,\"chunkSize\":16,\"heightMap\":%s,\"phase\":%d}",
-                cx, cz, Arrays.deepToString(terraHeight), phase
+                "{\"chunkX\":%d,\"chunkZ\":%d,\"chunkSize\":16,\"heightMap\":%s,\"phase\":%d,\"bboxRadius\":%d,\"arnisPath\":\"%s\"}",
+                cx, cz, Arrays.deepToString(terraHeight), phase, bboxRadius, arnisPath
         );
         conn.getOutputStream().write(json.getBytes());
         if (conn.getResponseCode() == 200) return conn.getInputStream().readAllBytes();
         return null;
     }
 
+    // Paste schematic into world
     private void pasteDelta(int cx, int cz, byte[] data, World world) {
         Runnable task = () -> {
             try {
@@ -176,17 +221,18 @@ public class HybridSurvivalConfigPlugin extends JavaPlugin implements Listener {
                 try (ClipboardReader reader = format.getReader(new ByteArrayInputStream(data))) {
                     com.sk89q.worldedit.extent.clipboard.Clipboard clipboard = reader.read();
                     ClipboardHolder holder = new ClipboardHolder(clipboard);
-                    EditSession editSession = WorldEdit.getInstance().newEditSession(BukkitAdapter.adapt(world));
-                    int xPos = cx * 16, zPos = cz * 16;
-                    holder.createPaste(editSession).to(com.sk89q.worldedit.math.BlockVector3.at(xPos, 0, zPos))
-                            .ignoreAirBlocks(false).build().paste();
-                    editSession.flushQueue();
+                    try (EditSession editSession = WorldEdit.getInstance().newEditSession(BukkitAdapter.adapt(world))) {
+                        int xPos = cx * 16, zPos = cz * 16;
+                        holder.createPaste(editSession)
+                                .to(com.sk89q.worldedit.math.BlockVector3.at(xPos, 0, zPos))
+                                .ignoreAirBlocks(false).build().paste();
+                        editSession.flushQueue();
+                    }
                 }
                 if (lazyLight) queueLazyLight(cx, cz, world);
             } catch (Exception e) { e.printStackTrace(); }
         };
-        if (pasteThreading) pastePool.submit(task);
-        else task.run();
+        if (pasteThreading) pastePool.submit(task); else task.run();
     }
 
     private void queueLazyLight(int cx, int cz, World world) { lightQueue.add(new ChunkPosition(cx, cz, world)); }
@@ -233,7 +279,7 @@ public class HybridSurvivalConfigPlugin extends JavaPlugin implements Listener {
         if (!signPurchase) return;
         if (e.getAction() != Action.RIGHT_CLICK_BLOCK) return;
         Block block = e.getClickedBlock();
-        if (block.getType() != Material.OAK_SIGN) return;
+        if (block == null || block.getType() != Material.OAK_SIGN) return;
         Sign sign = (Sign) block.getState();
         String line1 = sign.getLine(1);
         BuildingData building = buildings.get(line1);
@@ -243,8 +289,4 @@ public class HybridSurvivalConfigPlugin extends JavaPlugin implements Listener {
         sign.setLine(3, e.getPlayer().getName());
         sign.update();
     }
-
-    // ==================== Getter für Commands ====================
-    public Map<String, BuildingData> getBuildings() { return buildings; }
-    public BuildingData getBuilding(String address) { return buildings.get(address); }
 }
