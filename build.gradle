@@ -3,8 +3,8 @@ plugins {
 }
 
 group = 'de.yourplugin.hybrid'
-version = '1.0'
-description = 'Hybrid Survival Worldgen with Arnis integration'
+version = '1.0.0'
+description = 'Hybrid Survival Plugin'
 
 java {
     toolchain {
@@ -14,24 +14,20 @@ java {
 
 repositories {
     mavenCentral()
-    maven {
-        name = 'papermc'
-        url = 'https://repo.papermc.io/repository/maven-public/'
-    }
+    maven { url = 'https://maven.enginehub.org/repo/' }
+    maven { url = 'https://repo.papermc.io/repository/maven-public/' }
 }
 
 dependencies {
     compileOnly 'io.papermc.paper:paper-api:1.21.4-R0.1-SNAPSHOT'
-    implementation 'com.google.code.gson:gson:2.10.1'
-    implementation 'com.sk89q.worldedit:worldedit-bukkit:7.2.14' // optional, adjust to your WE version
+    compileOnly 'com.sk89q.worldedit:worldedit-bukkit:7.3.0'
 }
 
-tasks.withType(JavaCompile).configureEach {
+tasks.withType(JavaCompile) {
     options.encoding = 'UTF-8'
 }
 
 jar {
     archiveBaseName.set('HybridSurvivalPlugin')
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
-    // If you want a single fat jar include a shadow plugin; left out intentionally.
 }
