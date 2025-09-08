@@ -4,11 +4,10 @@ import com.sk89q.worldedit.*;
 import com.sk89q.worldedit.bukkit.BukkitAdapter;
 import com.sk89q.worldedit.extent.clipboard.*;
 import com.sk89q.worldedit.extent.clipboard.io.*;
-import com.sk89q.worldedit.session.ClipboardHolder;
+import de.yourplugin.hybrid.commands.*;
 import org.bukkit.*;
 import org.bukkit.block.Block;
 import org.bukkit.block.Sign;
-import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.entity.Player;
 import org.bukkit.event.Listener;
 import org.bukkit.event.EventHandler;
@@ -31,8 +30,6 @@ public class HybridSurvivalConfigPlugin extends JavaPlugin implements Listener {
     private boolean asyncEvents, telemetry, chunkCacheEnabled, prefetchSpawn;
 
     private int maxChunksPerTick, lightsPerTick, preloadRadius;
-    private String arnisPath;
-    private int bboxRadius;
 
     private final ChunkCache chunkCache = new ChunkCache();
     private final Queue<ChunkPosition> lightQueue = new ConcurrentLinkedQueue<>();
@@ -40,49 +37,35 @@ public class HybridSurvivalConfigPlugin extends JavaPlugin implements Listener {
     private ExecutorService pastePool;
     private final Map<String, BuildingData> buildings = new ConcurrentHashMap<>();
 
-    private StreetGenerator streetGen;
-    private DecorationManager decoMgr;
-
     @Override
     public void onEnable() {
         saveDefaultConfig();
-        FileConfiguration cfg = getConfig();
 
-        // Kern-Features
-        progressiveDetail = cfg.getBoolean("progressive-detail", true);
-        chunkPreload = cfg.getBoolean("chunk-preload", true);
-        lazyLight = cfg.getBoolean("lazy-light", true);
-        rpcThreading = cfg.getBoolean("rpc-threading", true);
-        pasteThreading = cfg.getBoolean("paste-threading", true);
+        // Config laden
+        progressiveDetail = getConfig().getBoolean("progressive-detail", true);
+        chunkPreload = getConfig().getBoolean("chunk-preload", true);
+        lazyLight = getConfig().getBoolean("lazy-light", true);
+        rpcThreading = getConfig().getBoolean("rpc-threading", true);
+        pasteThreading = getConfig().getBoolean("paste-threading", true);
 
-        // Gebäude & Immobilien
-        generateBuildings = cfg.getBoolean("generate-buildings", true);
-        buildingPurchase = cfg.getBoolean("building-purchase", true);
-        signPurchase = cfg.getBoolean("sign-purchase", true);
-        osmInteriors = cfg.getBoolean("osm-interiors", false);
-        shopSystem = cfg.getBoolean("shop-system", false);
-        synchronizeHeight = cfg.getBoolean("synchronize-height", true);
-        teleportToBuilding = cfg.getBoolean("teleport-to-building", true);
-        commandPurchase = cfg.getBoolean("command-purchase", true);
-        buildingSell = cfg.getBoolean("building-sell", true);
-        guiBuildingList = cfg.getBoolean("gui-building-list", true);
+        generateBuildings = getConfig().getBoolean("generate-buildings", true);
+        buildingPurchase = getConfig().getBoolean("building-purchase", true);
+        signPurchase = getConfig().getBoolean("sign-purchase", true);
+        osmInteriors = getConfig().getBoolean("osm-interiors", false);
+        shopSystem = getConfig().getBoolean("shop-system", false);
+        synchronizeHeight = getConfig().getBoolean("synchronize-height", true);
+        teleportToBuilding = getConfig().getBoolean("teleport-to-building", true);
+        commandPurchase = getConfig().getBoolean("command-purchase", true);
+        buildingSell = getConfig().getBoolean("building-sell", true);
+        guiBuildingList = getConfig().getBoolean("gui-building-list", true);
 
-        // Performance
-        maxChunksPerTick = cfg.getInt("max-chunks-per-tick", 16);
-        lightsPerTick = cfg.getInt("lights-per-tick", 2);
-        preloadRadius = cfg.getInt("preload-radius", 16);
-        asyncEvents = cfg.getBoolean("async-events", true);
-        telemetry = cfg.getBoolean("telemetry", true);
-        chunkCacheEnabled = cfg.getBoolean("chunk-cache", true);
-        prefetchSpawn = cfg.getBoolean("prefetch-spawn", true);
-
-        // Arnis-Integration
-        arnisPath = cfg.getString("arnis.path", "/usr/local/bin/arnis");
-        bboxRadius = cfg.getInt("arnis.bbox-radius-meters", 100);
-
-        // Extra-Manager
-        streetGen = new StreetGenerator(cfg);
-        decoMgr = new DecorationManager(cfg);
+        maxChunksPerTick = getConfig().getInt("max-chunks-per-tick", 16);
+        lightsPerTick = getConfig().getInt("lights-per-tick", 2);
+        preloadRadius = getConfig().getInt("preload-radius", 16);
+        asyncEvents = getConfig().getBoolean("async-events", true);
+        telemetry = getConfig().getBoolean("telemetry", true);
+        chunkCacheEnabled = getConfig().getBoolean("chunk-cache", true);
+        prefetchSpawn = getConfig().getBoolean("prefetch-spawn", true);
 
         // Thread-Pools
         if (rpcThreading) rpcPool = Executors.newFixedThreadPool(8);
@@ -92,7 +75,11 @@ public class HybridSurvivalConfigPlugin extends JavaPlugin implements Listener {
         Bukkit.getPluginManager().registerEvents(this, this);
         if (lazyLight) Bukkit.getScheduler().runTaskTimer(this, this::processLazyLight, 1L, 1L);
 
-        getLogger().info("HybridSurvivalConfigPlugin enabled with Arnis at: " + arnisPath);
+        // Commands
+        getCommand("buybuilding").setExecutor(new BuyBuildingCommand(this));
+        getCommand("sellbuilding").setExecutor(new SellBuildingCommand(this));
+        getCommand("tpbuilding").setExecutor(new TpBuildingCommand(this));
+        getCommand("listbuildings").setExecutor(new ListBuildingsCommand(this));
     }
 
     @Override
@@ -151,24 +138,18 @@ public class HybridSurvivalConfigPlugin extends JavaPlugin implements Listener {
                             if (chunkCacheEnabled) chunkCache.put(cx, cz, arnisData);
                             pasteDelta(cx, cz, arnisData, player.getWorld());
                         }
-
                         if (generateBuildings) generateBuilding(cx, cz, player.getWorld());
-                        streetGen.generateStreet(player.getWorld(), new Location(player.getWorld(), cx * 16, 64, cz * 16));
-                        streetGen.generateParking(player.getWorld(), new Location(player.getWorld(), cx * 16 + 8, 64, cz * 16 + 8));
-                        decoMgr.placeLamp(player.getWorld(), new Location(player.getWorld(), cx * 16 + 4, 65, cz * 16 + 4));
-
                     } catch (Exception e) { e.printStackTrace(); }
                 }
             }
         };
-        if (rpcThreading) rpcPool.submit(task); else task.run();
+        if (rpcThreading) rpcPool.submit(task);
+        else task.run();
     }
 
     private int[][] fetchTerraHeight(int cx, int cz) {
         int[][] heightMap = new int[16][16];
-        for (int x = 0; x < 16; x++)
-            for (int z = 0; z < 16; z++)
-                heightMap[x][z] = 64;
+        for (int x = 0; x < 16; x++) for (int z = 0; z < 16; z++) heightMap[x][z] = 64;
         return heightMap;
     }
 
@@ -195,18 +176,17 @@ public class HybridSurvivalConfigPlugin extends JavaPlugin implements Listener {
                 try (ClipboardReader reader = format.getReader(new ByteArrayInputStream(data))) {
                     com.sk89q.worldedit.extent.clipboard.Clipboard clipboard = reader.read();
                     ClipboardHolder holder = new ClipboardHolder(clipboard);
-                    try (EditSession editSession = WorldEdit.getInstance().newEditSession(BukkitAdapter.adapt(world))) {
-                        int xPos = cx * 16, zPos = cz * 16;
-                        holder.createPaste(editSession)
-                                .to(com.sk89q.worldedit.math.BlockVector3.at(xPos, 0, zPos))
-                                .ignoreAirBlocks(false).build().paste();
-                        editSession.flushQueue();
-                    }
+                    EditSession editSession = WorldEdit.getInstance().newEditSession(BukkitAdapter.adapt(world));
+                    int xPos = cx * 16, zPos = cz * 16;
+                    holder.createPaste(editSession).to(com.sk89q.worldedit.math.BlockVector3.at(xPos, 0, zPos))
+                            .ignoreAirBlocks(false).build().paste();
+                    editSession.flushQueue();
                 }
                 if (lazyLight) queueLazyLight(cx, cz, world);
             } catch (Exception e) { e.printStackTrace(); }
         };
-        if (pasteThreading) pastePool.submit(task); else task.run();
+        if (pasteThreading) pastePool.submit(task);
+        else task.run();
     }
 
     private void queueLazyLight(int cx, int cz, World world) { lightQueue.add(new ChunkPosition(cx, cz, world)); }
@@ -263,4 +243,8 @@ public class HybridSurvivalConfigPlugin extends JavaPlugin implements Listener {
         sign.setLine(3, e.getPlayer().getName());
         sign.update();
     }
+
+    // ==================== Getter für Commands ====================
+    public Map<String, BuildingData> getBuildings() { return buildings; }
+    public BuildingData getBuilding(String address) { return buildings.get(address); }
 }
