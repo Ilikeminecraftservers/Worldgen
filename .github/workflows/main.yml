@@ -1,10 +1,10 @@
-name: Java CI with Gradle
+name: Build Plugin
 
 on:
   push:
-    branches: [ "main" ]
+    branches:
+      - main
   pull_request:
-    branches: [ "main" ]
 
 jobs:
   build:
@@ -20,20 +20,10 @@ jobs:
           distribution: temurin
           java-version: 21
 
-      - name: Cache Gradle packages
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.gradle/caches
-            ~/.gradle/wrapper
-          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
-          restore-keys: |
-            ${{ runner.os }}-gradle-
+      - name: Build with Gradle
+        run: ./gradlew clean shadowJar --refresh-dependencies --stacktrace
 
-      - name: Build with system Gradle
-        run: gradle clean build --refresh-dependencies --stacktrace
-
-      - name: Upload plugin JAR
+      - name: Upload Plugin Artifact
         uses: actions/upload-artifact@v4
         with:
           name: HybridSurvivalPlugin
