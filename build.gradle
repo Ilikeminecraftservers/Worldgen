@@ -3,60 +3,35 @@ plugins {
 }
 
 group = 'de.yourplugin.hybrid'
-version = '1.0.0'
-description = 'Hybrid Survival Plugin mit Arnis-Integration'
-
-java {
-    toolchain {
-        languageVersion = JavaLanguageVersion.of(21) // Paper 1.21.4 benötigt Java 21
-    }
-}
+version = '1.0-SNAPSHOT'
 
 repositories {
     mavenCentral()
-
-    // Paper API
-    maven {
-        name = "papermc"
-        url = "https://repo.papermc.io/repository/maven-public/"
-    }
-
-    // EngineHub (WorldEdit & WorldGuard)
-    maven {
-        name = "enginehub"
-        url = "https://maven.enginehub.org/repo/"
-    }
+    maven { url "https://maven.enginehub.org/repo/" }   // WorldEdit Repo
+    maven { url "https://papermc.io/repo/repository/maven-public/" } // Paper API
 }
 
 dependencies {
-    // Paper API (compileOnly, Plugin läuft nur im Server)
+    // PaperMC API (deine Server-Version anpassen!)
     compileOnly "io.papermc.paper:paper-api:1.21.4-R0.1-SNAPSHOT"
 
-    // WorldEdit API (compileOnly)
-    compileOnly "com.sk89q.worldedit:worldedit-bukkit:7.2.14"
+    // WorldEdit (Upgrade auf 7.3.0)
+    compileOnly "com.sk89q.worldedit:worldedit-bukkit:7.3.0"
 
-    // Lombok (falls du es nutzen willst)
-    compileOnly 'org.projectlombok:lombok:1.18.32'
-    annotationProcessor 'org.projectlombok:lombok:1.18.32'
-
-    // Test Dependencies
-    testImplementation 'org.junit.jupiter:junit-jupiter-api:5.10.0'
-    testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.10.0'
+    // Optional: WorldGuard falls du es brauchst
+    // compileOnly "com.sk89q.worldguard:worldguard-bukkit:7.0.9"
 }
 
-tasks.withType(JavaCompile).configureEach {
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21) // Paper 1.21.4 → Java 21
+    }
+}
+
+tasks.withType(JavaCompile) {
     options.encoding = 'UTF-8'
 }
 
-tasks.test {
-    useJUnitPlatform()
-}
-
-jar {
-    archiveBaseName.set("HybridSurvivalPlugin")
-    archiveVersion.set(version)
-    from {
-        configurations.runtimeClasspath.collect { it.isDirectory() ? it : zipTree(it) }
-    }
-    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+tasks.withType(Javadoc) {
+    options.encoding = 'UTF-8'
 }
