@@ -12,6 +12,8 @@ import org.bukkit.event.player.*;
 import org.bukkit.event.block.Action;
 import org.bukkit.plugin.java.JavaPlugin;
 
+import de.yourplugin.hybrid.decoration.DecorationManager;
+
 import java.util.*;
 import java.util.concurrent.*;
 
