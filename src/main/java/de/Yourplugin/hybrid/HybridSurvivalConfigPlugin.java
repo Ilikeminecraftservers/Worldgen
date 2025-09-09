@@ -17,6 +17,11 @@ import de.yourplugin.hybrid.decoration.DecorationManager;
 import java.util.*;
 import java.util.concurrent.*;
 
+/**
+ * Hauptklasse des HybridSurvivalConfigPlugins.
+ * Enthält Konfiguration, Manager-Initialisierung, Arnis-Integration, Lazy-Light,
+ * Dummy-Integration für Buildings sowie Listener und Commands.
+ */
 public class HybridSurvivalConfigPlugin extends JavaPlugin implements Listener {
 
     // ==================== Config Flags ====================
@@ -113,10 +118,14 @@ public class HybridSurvivalConfigPlugin extends JavaPlugin implements Listener {
         }
 
         // Commands
-        getCommand("buybuilding").setExecutor(new BuyBuildingCommand(this));
-        getCommand("sellbuilding").setExecutor(new SellBuildingCommand(this));
-        getCommand("listbuildings").setExecutor(new ListBuildingsCommand(this));
-        getCommand("tpbuilding").setExecutor(new TpBuildingCommand(this));
+        if (getCommand("buybuilding") != null)
+            getCommand("buybuilding").setExecutor(new BuyBuildingCommand(this));
+        if (getCommand("sellbuilding") != null)
+            getCommand("sellbuilding").setExecutor(new SellBuildingCommand(this));
+        if (getCommand("listbuildings") != null)
+            getCommand("listbuildings").setExecutor(new ListBuildingsCommand(this));
+        if (getCommand("tpbuilding") != null)
+            getCommand("tpbuilding").setExecutor(new TpBuildingCommand(this));
 
         getLogger().info("HybridSurvivalConfigPlugin enabled with Arnis at: " + arnisPath);
     }
