@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
+      - name: Checkout code
         uses: actions/checkout@v4
 
       - name: Set up JDK 21
@@ -20,10 +20,13 @@ jobs:
           distribution: temurin
           java-version: 21
 
-      - name: Build with Gradle (no wrapper)
+      - name: Setup Gradle
+        uses: gradle/gradle-build-action@v2
+
+      - name: Build with Gradle
         run: gradle build --stacktrace
 
-      - name: Upload Plugin Artifact
+      - name: Upload Plugin JAR
         uses: actions/upload-artifact@v4
         with:
           name: HybridSurvivalPlugin
