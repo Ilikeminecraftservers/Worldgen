@@ -1,47 +1,61 @@
-package de.yourplugin.hybrid;
+package de.example.worldgen;
 
-import com.sk89q.worldedit.EditSession;
-import com.sk89q.worldedit.WorldEdit;
+import com.sk89q.worldedit.WorldEditException;
+import com.sk89q.worldedit.bukkit.BukkitWorld;
 import com.sk89q.worldedit.extent.clipboard.Clipboard;
 import com.sk89q.worldedit.extent.clipboard.io.ClipboardFormat;
 import com.sk89q.worldedit.extent.clipboard.io.ClipboardFormats;
 import com.sk89q.worldedit.extent.clipboard.io.ClipboardReader;
-import com.sk89q.worldedit.function.operation.Operation;
-import com.sk89q.worldedit.function.operation.Operations;
 import com.sk89q.worldedit.session.ClipboardHolder;
-import org.bukkit.World;
+import com.sk89q.worldedit.world.World;
+import org.bukkit.Bukkit;
+import org.bukkit.Location;
+import org.bukkit.entity.Player;
 
 import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.io.InputStream;
 
 public class DecorationManager {
 
-    public DecorationManager() { }
+    public static void pasteSchematic(Player player, byte[] schematicData, Location location) {
+        try {
+            InputStream in = new ByteArrayInputStream(schematicData);
 
-    public void pasteSchematic(World world, byte[] data, int x, int y, int z) {
-        try (ByteArrayInputStream in = new ByteArrayInputStream(data)) {
-            ClipboardFormat format = ClipboardFormats.detect(in);
-            if (format == null) return;
+            // NEU: findByInputStream statt detect()
+            ClipboardFormat format = ClipboardFormats.findByInputStream(in);
 
-            try (ClipboardReader reader = format.getReader(new ByteArrayInputStream(data))) {
+            if (format == null) {
+                player.sendMessage("§cUnbekanntes Schematic-Format!");
+                return;
+            }
+
+            try (ClipboardReader reader = format.getReader(in)) {
                 Clipboard clipboard = reader.read();
+                World adaptedWorld = new BukkitWorld(location.getWorld());
+
                 ClipboardHolder holder = new ClipboardHolder(clipboard);
 
-                try (EditSession editSession = WorldEdit.getInstance()
-                        .newEditSession(com.sk89q.worldedit.bukkit.BukkitAdapter.adapt(world))) {
-                    Operation op = holder.createPaste(editSession)
-                            .to(com.sk89q.worldedit.math.BlockVector3.at(x, y, z))
-                            .ignoreAirBlocks(false)
-                            .build();
-                    Operations.complete(op);
-                }
+                Bukkit.getScheduler().runTask(WorldgenPlugin.getInstance(), () -> {
+                    try {
+                        holder.createPaste(adaptedWorld)
+                                .to(com.sk89q.worldedit.math.BlockVector3.at(
+                                        location.getBlockX(),
+                                        location.getBlockY(),
+                                        location.getBlockZ()
+                                ))
+                                .ignoreAirBlocks(true)
+                                .build();
+                        player.sendMessage("§aSchematic erfolgreich eingefügt!");
+                    } catch (WorldEditException e) {
+                        player.sendMessage("§cFehler beim Einfügen des Schematics: " + e.getMessage());
+                        e.printStackTrace();
+                    }
+                });
             }
-        } catch (Exception e) {
+        } catch (IOException e) {
+            player.sendMessage("§cFehler beim Laden des Schematics: " + e.getMessage());
             e.printStackTrace();
         }
-    }
-
-    // Beispiel wrapper für später
-    public void placeLamp(World world, org.bukkit.Location loc) {
-        // implement using pasteSchematic or direct block placement
     }
 }
