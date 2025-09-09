@@ -20,6 +20,16 @@ jobs:
           distribution: temurin
           java-version: 21
 
+      - name: Ensure Gradle wrapper is present
+        run: |
+          if [ ! -f gradle/wrapper/gradle-wrapper.jar ]; then
+            echo "gradle-wrapper.jar fehlt – generiere neu..."
+            gradle wrapper --gradle-version 8.8
+          fi
+
+      - name: Make gradlew executable
+        run: chmod +x gradlew
+
       - name: Build with Gradle
         run: ./gradlew clean shadowJar --refresh-dependencies --stacktrace
 
