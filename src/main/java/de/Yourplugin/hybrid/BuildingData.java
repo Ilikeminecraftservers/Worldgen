@@ -1,25 +1,42 @@
 package de.yourplugin.hybrid;
 
 import org.bukkit.Location;
-import org.bukkit.entity.Player;
 import java.util.UUID;
 
 public class BuildingData {
-    private Location location;
-    private String street;
-    private int number;
-    private UUID owner;
+    private final Location location;
+    private String owner; // Spielername
+    private final double price;
+    private UUID ownerUUID; // optional
 
-    public BuildingData(Location loc, String street, int number){
-        this.location = loc;
-        this.street = street;
-        this.number = number;
+    public BuildingData(Location location, String owner, double price) {
+        this.location = location;
+        this.owner = owner;
+        this.price = price;
     }
 
-    public String getAddress(){ return street+" "+number; }
-    public Location getLocation(){ return location; }
+    public Location getLocation() {
+        return location;
+    }
 
-    public void setOwner(UUID owner){ this.owner=owner; }
-    public boolean isPurchased(){ return owner!=null; }
-    public boolean isOwner(Player p){ return owner!=null && owner.equals(p.getUniqueId()); }
+    public String getOwner() {
+        return owner;
+    }
+
+    public void setOwner(String owner) {
+        this.owner = owner;
+    }
+
+    public double getPrice() {
+        return price;
+    }
+
+    // Address helper: use world coords if you need a string
+    public String getAddress() {
+        return location.getWorld().getName() + ":" + location.getBlockX() + "," + location.getBlockZ();
+    }
+
+    public boolean isPurchased() {
+        return owner != null && !owner.isEmpty();
+    }
 }
