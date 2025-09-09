@@ -1,10 +1,8 @@
-name: Build & Release Plugin
+name: Java CI with Gradle
 
 on:
   push:
     branches: [ "main" ]
-    tags:
-      - "v*"
   pull_request:
     branches: [ "main" ]
 
@@ -21,35 +19,22 @@ jobs:
         with:
           distribution: temurin
           java-version: 21
-          cache: gradle
 
-      - name: Grant execute permission for Gradlew
-        run: chmod +x gradlew
+      - name: Cache Gradle packages
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
 
-      - name: Build with Gradle
-        run: ./gradlew clean build --refresh-dependencies --stacktrace
+      - name: Build with system Gradle
+        run: gradle clean build --refresh-dependencies --stacktrace
 
-      - name: Upload build artifact
+      - name: Upload plugin JAR
         uses: actions/upload-artifact@v4
         with:
           name: HybridSurvivalPlugin
           path: build/libs/*.jar
-
-  release:
-    if: startsWith(github.ref, 'refs/tags/')
-    needs: build
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Download build artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: HybridSurvivalPlugin
-          path: build/libs
-
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          files: build/libs/*.jar
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
