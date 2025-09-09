@@ -1,37 +1,60 @@
 plugins {
     id 'java'
+    id 'com.github.johnrengelman.shadow' version '8.1.1' // für fat-jar falls du alles in eine JAR bündeln willst
 }
 
 group = 'de.yourplugin.hybrid'
-version = '1.0-SNAPSHOT'
-
-repositories {
-    mavenCentral()
-    maven { url "https://maven.enginehub.org/repo/" }   // WorldEdit Repo
-    maven { url "https://papermc.io/repo/repository/maven-public/" } // Paper API
-}
-
-dependencies {
-    // PaperMC API (deine Server-Version anpassen!)
-    compileOnly "io.papermc.paper:paper-api:1.21.4-R0.1-SNAPSHOT"
-
-    // WorldEdit (Upgrade auf 7.3.0)
-    compileOnly "com.sk89q.worldedit:worldedit-bukkit:7.3.0"
-
-    // Optional: WorldGuard falls du es brauchst
-    // compileOnly "com.sk89q.worldguard:worldguard-bukkit:7.0.9"
-}
+version = '1.0.0'
 
 java {
     toolchain {
-        languageVersion = JavaLanguageVersion.of(21) // Paper 1.21.4 → Java 21
+        languageVersion = JavaLanguageVersion.of(21)
     }
 }
 
-tasks.withType(JavaCompile) {
-    options.encoding = 'UTF-8'
+repositories {
+    mavenCentral()
+    maven {
+        url = uri("https://jitpack.io")
+    }
+    maven {
+        url = uri("https://repo.papermc.io/repository/maven-public/")
+    }
+    maven {
+        url = uri("https://maven.enginehub.org/repo/")
+    }
 }
 
-tasks.withType(Javadoc) {
+dependencies {
+    // Paper API
+    compileOnly "io.papermc.paper:paper-api:1.21.4-R0.1-SNAPSHOT"
+
+    // WorldEdit (EngineHub Maven)
+    compileOnly "com.sk89q.worldedit:worldedit-bukkit:7.2.18"
+
+    // Falls du WorldGuard brauchst -> auch EngineHub Maven
+    // compileOnly "com.sk89q.worldguard:worldguard-bukkit:7.0.9"
+
+    // Lombok (nur compile-time)
+    compileOnly "org.projectlombok:lombok:1.18.32"
+    annotationProcessor "org.projectlombok:lombok:1.18.32"
+
+    // Tests (optional)
+    testImplementation platform("org.junit:junit-bom:5.10.2")
+    testImplementation "org.junit.jupiter:junit-jupiter"
+}
+
+tasks.withType(JavaCompile).configureEach {
     options.encoding = 'UTF-8'
+    options.release.set(21)
+}
+
+tasks.test {
+    useJUnitPlatform()
+}
+
+tasks.register('copyJar', Copy) {
+    dependsOn shadowJar
+    from shadowJar.archiveFile
+    into "$buildDir/output"
 }
