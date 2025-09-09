@@ -1,5 +1,6 @@
 package de.yourplugin.hybrid;
 
+import com.sk89q.worldedit.WorldEdit;
 import com.sk89q.worldedit.bukkit.BukkitAdapter;
 import org.bukkit.*;
 import org.bukkit.block.Block;
@@ -8,16 +9,13 @@ import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.entity.Player;
 import org.bukkit.event.Listener;
 import org.bukkit.event.EventHandler;
+import org.bukkit.event.player.*;
 import org.bukkit.event.block.Action;
-import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import java.util.*;
 import java.util.concurrent.*;
 
-/**
- * Hauptklasse des HybridSurvival Plugins
- */
 public class HybridSurvivalConfigPlugin extends JavaPlugin implements Listener {
 
     // ==================== Config Flags ====================
@@ -34,15 +32,14 @@ public class HybridSurvivalConfigPlugin extends JavaPlugin implements Listener {
     private int bboxRadius;
     private Material streetBlock, lineBlock, sidewalkBlock, parkingBlock, parkingLineBlock;
 
-    // ==================== Manager ====================
     private final ChunkCache chunkCache = new ChunkCache();
-    private final Queue<Location> lightQueue = new ConcurrentLinkedQueue<>();
+    private final Queue<ChunkPosition> lightQueue = new ConcurrentLinkedQueue<>();
     private ExecutorService rpcPool;
     private ExecutorService pastePool;
 
     private StreetGenerator streetGen;
     private DecorationManager decoMgr;
-    private BuildingManager buildingManager;
+    private BuildingManager buildingManager;  // Zentrale Verwaltung aller Gebäude
 
     @Override
     public void onEnable() {
@@ -99,7 +96,7 @@ public class HybridSurvivalConfigPlugin extends JavaPlugin implements Listener {
 
         // Manager
         streetGen = new StreetGenerator(cfg);
-        decoMgr = new DecorationManager(cfg);
+        decoMgr = new DecorationManager();
         buildingManager = new BuildingManager();
 
         // Thread-Pools
@@ -109,7 +106,7 @@ public class HybridSurvivalConfigPlugin extends JavaPlugin implements Listener {
         // Listener
         Bukkit.getPluginManager().registerEvents(this, this);
 
-        // LazyLight: queue-Verarbeitung
+        // Lazy light processing
         if (lazyLight) {
             Bukkit.getScheduler().runTaskTimer(this, this::processLazyLight, 1L, 1L);
         }
@@ -132,6 +129,15 @@ public class HybridSurvivalConfigPlugin extends JavaPlugin implements Listener {
     // Getter für BuildingManager
     public BuildingManager getBuildingManager() {
         return buildingManager;
+    }
+
+    // ==================== Lazy Light ====================
+    private void processLazyLight() {
+        for (int i = 0; i < lightsPerTick; i++) {
+            ChunkPosition pos = lightQueue.poll();
+            if (pos == null) break;
+            // Hier könnte z. B. eine Lichtquelle gesetzt oder Lighting-API getriggert werden
+        }
     }
 
     // ==================== Gebäude ====================
@@ -169,31 +175,10 @@ public class HybridSurvivalConfigPlugin extends JavaPlugin implements Listener {
         BuildingData building = buildingManager.getBuilding(line1);
         if (building == null || building.isPurchased()) return;
 
-        building.setOwner(e.getPlayer().getUniqueId());
+        // FIX: UUID zu String
+        building.setOwner(e.getPlayer().getUniqueId().toString());
         sign.setLine(2, "Besitzer:");
         sign.setLine(3, e.getPlayer().getName());
         sign.update();
-    }
-
-    // ==================== Lazy Light ====================
-    private void processLazyLight() {
-        int count = 0;
-        while (!lightQueue.isEmpty() && count < lightsPerTick) {
-            Location loc = lightQueue.poll();
-            if (loc != null && loc.getWorld() != null) {
-                Block b = loc.getWorld().getBlockAt(loc);
-                if (b.getType() == Material.AIR) {
-                    b.setType(Material.LIGHT);
-                }
-            }
-            count++;
-        }
-    }
-
-    /**
-     * Fügt einen neuen Lichtpunkt in die Lazy-Light-Queue ein.
-     */
-    public void queueLight(Location loc) {
-        lightQueue.add(loc);
     }
 }
