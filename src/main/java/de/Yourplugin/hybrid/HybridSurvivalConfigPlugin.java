@@ -1,10 +1,6 @@
 package de.yourplugin.hybrid;
 
-import com.sk89q.worldedit.*;
 import com.sk89q.worldedit.bukkit.BukkitAdapter;
-import com.sk89q.worldedit.extent.clipboard.*;
-import com.sk89q.worldedit.extent.clipboard.io.*;
-import com.sk89q.worldedit.session.ClipboardHolder;
 import org.bukkit.*;
 import org.bukkit.block.Block;
 import org.bukkit.block.Sign;
@@ -12,16 +8,16 @@ import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.entity.Player;
 import org.bukkit.event.Listener;
 import org.bukkit.event.EventHandler;
-import org.bukkit.event.player.*;
 import org.bukkit.event.block.Action;
+import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.plugin.java.JavaPlugin;
 
-import java.io.*;
-import java.net.HttpURLConnection;
-import java.net.URL;
 import java.util.*;
 import java.util.concurrent.*;
 
+/**
+ * Hauptklasse des HybridSurvival Plugins
+ */
 public class HybridSurvivalConfigPlugin extends JavaPlugin implements Listener {
 
     // ==================== Config Flags ====================
@@ -38,14 +34,15 @@ public class HybridSurvivalConfigPlugin extends JavaPlugin implements Listener {
     private int bboxRadius;
     private Material streetBlock, lineBlock, sidewalkBlock, parkingBlock, parkingLineBlock;
 
+    // ==================== Manager ====================
     private final ChunkCache chunkCache = new ChunkCache();
-    private final Queue<ChunkPosition> lightQueue = new ConcurrentLinkedQueue<>();
+    private final Queue<Location> lightQueue = new ConcurrentLinkedQueue<>();
     private ExecutorService rpcPool;
     private ExecutorService pastePool;
 
     private StreetGenerator streetGen;
     private DecorationManager decoMgr;
-    private BuildingManager buildingManager;  // Zentrale Verwaltung aller Gebäude
+    private BuildingManager buildingManager;
 
     @Override
     public void onEnable() {
@@ -111,7 +108,11 @@ public class HybridSurvivalConfigPlugin extends JavaPlugin implements Listener {
 
         // Listener
         Bukkit.getPluginManager().registerEvents(this, this);
-        if (lazyLight) Bukkit.getScheduler().runTaskTimer(this, this::processLazyLight, 1L, 1L);
+
+        // LazyLight: queue-Verarbeitung
+        if (lazyLight) {
+            Bukkit.getScheduler().runTaskTimer(this, this::processLazyLight, 1L, 1L);
+        }
 
         // Commands
         getCommand("buybuilding").setExecutor(new BuyBuildingCommand(this));
@@ -132,9 +133,6 @@ public class HybridSurvivalConfigPlugin extends JavaPlugin implements Listener {
     public BuildingManager getBuildingManager() {
         return buildingManager;
     }
-
-    // ==================== Player Move → Chunk Load ====================
-    // (Rest unverändert bis zu Gebäude-Generierung)
 
     // ==================== Gebäude ====================
     private void generateBuilding(int cx, int cz, World world) {
@@ -175,5 +173,27 @@ public class HybridSurvivalConfigPlugin extends JavaPlugin implements Listener {
         sign.setLine(2, "Besitzer:");
         sign.setLine(3, e.getPlayer().getName());
         sign.update();
+    }
+
+    // ==================== Lazy Light ====================
+    private void processLazyLight() {
+        int count = 0;
+        while (!lightQueue.isEmpty() && count < lightsPerTick) {
+            Location loc = lightQueue.poll();
+            if (loc != null && loc.getWorld() != null) {
+                Block b = loc.getWorld().getBlockAt(loc);
+                if (b.getType() == Material.AIR) {
+                    b.setType(Material.LIGHT);
+                }
+            }
+            count++;
+        }
+    }
+
+    /**
+     * Fügt einen neuen Lichtpunkt in die Lazy-Light-Queue ein.
+     */
+    public void queueLight(Location loc) {
+        lightQueue.add(loc);
     }
 }
