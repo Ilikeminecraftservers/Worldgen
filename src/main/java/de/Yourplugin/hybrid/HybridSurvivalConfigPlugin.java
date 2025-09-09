@@ -1,6 +1,5 @@
 package de.yourplugin.hybrid;
 
-import com.sk89q.worldedit.WorldEdit;
 import com.sk89q.worldedit.bukkit.BukkitAdapter;
 import org.bukkit.*;
 import org.bukkit.block.Block;
@@ -96,7 +95,7 @@ public class HybridSurvivalConfigPlugin extends JavaPlugin implements Listener {
 
         // Manager
         streetGen = new StreetGenerator(cfg);
-        decoMgr = new DecorationManager();
+        decoMgr = new DecorationManager(this);  // FIX: Plugin übergeben
         buildingManager = new BuildingManager();
 
         // Thread-Pools
